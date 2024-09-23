@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>最終版 星をタッチして消すゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000011; /* 背景をより暗くしました */
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            border: 1px solid #ffffff;
+        }
+        #gameInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #score, #timer {
+            color: #000000;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        #gameOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 32px;
+            display: none;
+        }
+        #replayButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameInfo">
+        <div id="score">スコア: 0</div>
+        <div id="timer">残り時間: 30秒</div>
+    </div>
+    <div id="gameOverlay">
+        <div id="finalScore"></div>
+        <button id="replayButton">もういちど</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const gameOverlay = document.getElementById('gameOverlay');
+        const finalScoreElement = document.getElementById('finalScore');
+        const replayButton = document.getElementById('replayButton');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0;
+        let timeLeft = 30;
+        let stars = [];
+        let particles = [];
+        let gameInterval;
+        let timerInterval;
+
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 40 + 30;
+                this.speedX = Math.random() * 2 - 1;
+                this.speedY = Math.random() * 2 - 1;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+
+            draw() {
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    ctx.lineTo(
+                        this.x + this.size * Math.cos((i * 4 * Math.PI) / 5),
+                        this.y + this.size * Math.sin((i * 4 * Math.PI) / 5)
+                    );
+                    ctx.lineTo(
+                        this.x + (this.size / 2) * Math.cos(((i * 4 + 2) * Math.PI) / 5),
+                        this.y + (this.size / 2) * Math.sin(((i * 4 + 2) * Math.PI) / 5)
+                    );
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 5 + 1;
+                this.speedX = Math.random() * 6 - 3;
+                this.speedY = Math.random() * 6 - 3;
+                this.color = `hsl(${Math.random() * 60 + 30}, 100%, 50%)`;
+                this.life = 30;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.size > 0.2) this.size -= 0.1;
+                this.life--;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function createStars() {
+            if (stars.length < 5) {
+                stars.push(new Star());
+            }
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            stars.forEach((star, index) => {
+                star.update();
+                star.draw();
+            });
+
+            particles.forEach((particle, index) => {
+                particle.update();
+                particle.draw();
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+
+            createStars();
+        }
+
+        function startGame() {
+            score = 0;
+            timeLeft = 30;
+            stars = [];
+            particles = [];
+            updateScore();
+            updateTimer();
+            gameOverlay.style.display = 'none';
+
+            gameInterval = setInterval(updateGame, 1000 / 60);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimer();
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            finalScoreElement.textContent = `ゲーム終了！\nあなたのスコア: ${score}`;
+            gameOverlay.style.display = 'flex';
+        }
+
+        function updateScore() {
+            scoreElement.textContent = `スコア: ${score}`;
+        }
+
+        function updateTimer() {
+            timerElement.textContent = `残り時間: ${timeLeft}秒`;
+        }
+
+        function createParticles(x, y) {
+            for (let i = 0; i < 30; i++) {
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            stars.forEach((star, index) => {
+                const dx = x - star.x;
+                const dy = y - star.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < star.size) {
+                    stars.splice(index, 1);
+                    createParticles(star.x, star.y);
+                    score++;
+                    updateScore();
+                }
+            });
+        });
+
+        replayButton.addEventListener('click', startGame);
+
+        startGame();
+    </script>
+</body>
+</html>
